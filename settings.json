@@ -1,19 +1,23 @@
 {
-    "WindowSize": {
-        "Width": 0,
-        "Hight": 0
-    },
-    "Bot": {
-        "IsWhiteBot": false,
-        "IsBlackBot": true,
-        "WhiteBotLevel": 0,
-        "BlackBotLevel": 5,
-        "BotScoringType": "NumberAndPotential",
-        "BotDelayMS": 0,
-        "NoRandom": false,
-        "Optimization": "O1"
-    },
-    "Game": {
-        "MaxNumTurns": 120
-    }
+  // Настройки окна
+  "WindowSize": {
+    "Width": 0, // ширина
+    "Hight": 0 // высота
+  },
+  // Настройки ИИ
+  "Bot": {
+    "IsWhiteBot": false, // бот играет за белых
+    "IsBlackBot": true, // бот играет за черных
+    "WhiteBotLevel": 0, // уровень бота, играющего за белых
+    "BlackBotLevel": 5, // уровень бота, играющего за черных
+    "BotScoringType": "NumberAndPotential", // тип оценки силы позиции
+    "BotDelayMS": 500, // задержка бота (для имитации "обдумывания")
+    "NoRandom": false, // использовать постоянное (true) или случайное (false) значение для seed в ГПСЧ
+    // влияет на повторяемость партий - если true, то бот будет одинаково реагировать на одинаковые ходы в разных партиях 
+    "Optimization": "O1" // оптимизация алгоритма
+  },
+  // Настройки игры
+  "Game": {
+    "MaxNumTurns": 120 // максимальное кол-во ходов
+  }
 }

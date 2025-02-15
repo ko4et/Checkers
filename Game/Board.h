@@ -16,6 +16,7 @@
 
 using namespace std;
 
+// Класс, отвечающий за отрисовку окна игры
 class Board
 {
 public:
@@ -24,14 +25,19 @@ public:
     {
     }
 
-    // draws start board
+    // Отрисовка начального окна
     int start_draw()
     {
+        // Инициализация SDL
         if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
         {
             print_exception("SDL_Init can't init SDL2 lib");
             return 1;
         }
+
+        // Если размеры окна в настройках заданы по умолчания (0),
+        // то задать квадратный размер на основе размеров 
+        // Рабочего стола Виндовс.
         if (W == 0 || H == 0)
         {
             SDL_DisplayMode dm;
@@ -44,18 +50,23 @@ public:
             W -= W / 15;
             H = W;
         }
+        // Создать окно программы
         win = SDL_CreateWindow("Checkers", 0, H / 30, W, H, SDL_WINDOW_RESIZABLE);
         if (win == nullptr)
         {
             print_exception("SDL_CreateWindow can't create window");
             return 1;
         }
+
+        // Создать Renderer
         ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
         if (ren == nullptr)
         {
             print_exception("SDL_CreateRenderer can't create renderer");
             return 1;
         }
+
+        // Загрузить текстуры
         board = IMG_LoadTexture(ren, board_path.c_str());
         w_piece = IMG_LoadTexture(ren, piece_white_path.c_str());
         b_piece = IMG_LoadTexture(ren, piece_black_path.c_str());
@@ -68,68 +79,94 @@ public:
             print_exception("IMG_LoadTexture can't load main textures from " + textures_path);
             return 1;
         }
+
+        // Перерисовать окно
         SDL_GetRendererOutputSize(ren, &W, &H);
         make_start_mtx();
         rerender();
         return 0;
     }
 
+    // Перерисовать окно
     void redraw()
     {
+        // очистить историю
         game_results = -1;
         history_mtx.clear();
         history_beat_series.clear();
+        // пересоздать начальное положение фигур
         make_start_mtx();
+        // Очистить подсветку
         clear_active();
         clear_highlight();
     }
 
+    // Передвинуть фигуру на доске 
     void move_piece(move_pos turn, const int beat_series = 0)
     {
         if (turn.xb != -1)
         {
+            // убрать с доски побитую фигуру
             mtx[turn.xb][turn.yb] = 0;
         }
         move_piece(turn.x, turn.y, turn.x2, turn.y2, beat_series);
     }
 
+    // Передвинуть фигуру на доске 
     void move_piece(const POS_T i, const POS_T j, const POS_T i2, const POS_T j2, const int beat_series = 0)
     {
+        
+        // Проверка начальной позиции
         if (mtx[i2][j2])
         {
             throw runtime_error("final position is not empty, can't move");
         }
+
+        // Проверка конечной позиции
         if (!mtx[i][j])
         {
             throw runtime_error("begin position is empty, can't move");
         }
+
         if ((mtx[i][j] == 1 && i2 == 0) || (mtx[i][j] == 2 && i2 == 7))
-            mtx[i][j] += 2;
+            mtx[i][j] += 2; // фигура стала дамкой
+
+        // переместить фигуру
         mtx[i2][j2] = mtx[i][j];
         drop_piece(i, j);
+        // добавить в историю
         add_history(beat_series);
     }
 
+    // Убрать фигуру с доски и перерисовать
     void drop_piece(const POS_T i, const POS_T j)
     {
         mtx[i][j] = 0;
         rerender();
     }
 
+    // Перевести фигуру в дамки и перерисовать
     void turn_into_queen(const POS_T i, const POS_T j)
     {
+        // Проверка, что фигура может стать дамкой
         if (mtx[i][j] == 0 || mtx[i][j] > 2)
         {
             throw runtime_error("can't turn into queen in this position");
         }
+
         mtx[i][j] += 2;
         rerender();
     }
+
+    // Вернуть игровое поле
     vector<vector<POS_T>> get_board() const
     {
         return mtx;
     }
 
+    // Подсветить заданные клетки зеленой рамкой.
+    // Применяется для выделения клеток, допустимых для
+    // выбора хода 
     void highlight_cells(vector<pair<POS_T, POS_T>> cells)
     {
         for (auto pos : cells)
@@ -140,6 +177,7 @@ public:
         rerender();
     }
 
+    // Очистить подсветку клеток
     void clear_highlight()
     {
         for (POS_T i = 0; i < 8; ++i)
@@ -149,6 +187,8 @@ public:
         rerender();
     }
 
+    // Подсветить клетку красной рамкой.
+    // Применяется для выделения активной фигуры.
     void set_active(const POS_T x, const POS_T y)
     {
         active_x = x;
@@ -156,6 +196,7 @@ public:
         rerender();
     }
 
+    // Очистить подсветку активной фигуры
     void clear_active()
     {
         active_x = -1;
@@ -163,39 +204,46 @@ public:
         rerender();
     }
 
+    // Проверяет, подсвечена ли данная клетка
     bool is_highlighted(const POS_T x, const POS_T y)
     {
         return is_highlighted_[x][y];
     }
 
+    // Отмотать один ход назад
     void rollback()
     {
+        // Нужно учитывать, что один ход мог состоять из нескольких взятий
         auto beat_series = max(1, *(history_beat_series.rbegin()));
         while (beat_series-- && history_mtx.size() > 1)
         {
             history_mtx.pop_back();
             history_beat_series.pop_back();
         }
+        // Сбросить подсветку
         mtx = *(history_mtx.rbegin());
         clear_highlight();
         clear_active();
     }
 
+    // Показать результат партии
     void show_final(const int res)
     {
         game_results = res;
         rerender();
     }
 
-    // use if window size changed
+    // Изменить размеры окна и перерисовать
     void reset_window_size()
     {
         SDL_GetRendererOutputSize(ren, &W, &H);
         rerender();
     }
 
+    // Выход
     void quit()
     {
+        // Освободить все выделенные ресурсы
         SDL_DestroyTexture(board);
         SDL_DestroyTexture(w_piece);
         SDL_DestroyTexture(b_piece);
@@ -208,6 +256,7 @@ public:
         SDL_Quit();
     }
 
+    // Деструктор
     ~Board()
     {
         if (win)
@@ -215,12 +264,15 @@ public:
     }
 
 private:
+    // Добавляет текущий ход в историю, для возможности обратной перемотки
     void add_history(const int beat_series = 0)
     {
         history_mtx.push_back(mtx);
+        // учет количества взятий
         history_beat_series.push_back(beat_series);
     }
-    // function to make start matrix
+
+    // Делает начальное расположение фигур
     void make_start_mtx()
     {
         for (POS_T i = 0; i < 8; ++i)
@@ -237,14 +289,14 @@ private:
         add_history();
     }
 
-    // function that re-draw all the textures
+    // Функция для перерисовки текстур
     void rerender()
     {
-        // draw board
+        // Рисовать доску
         SDL_RenderClear(ren);
         SDL_RenderCopy(ren, board, NULL, NULL);
 
-        // draw pieces
+        // Рисовать фигуры
         for (POS_T i = 0; i < 8; ++i)
         {
             for (POS_T j = 0; j < 8; ++j)
@@ -269,7 +321,7 @@ private:
             }
         }
 
-        // draw hilight
+        // Рисовать подсветку клеток
         SDL_SetRenderDrawColor(ren, 0, 255, 0, 0);
         const double scale = 2.5;
         SDL_RenderSetScale(ren, scale, scale);
@@ -285,7 +337,7 @@ private:
             }
         }
 
-        // draw active
+        // Рисовать подсветку активной фигуры
         if (active_x != -1)
         {
             SDL_SetRenderDrawColor(ren, 255, 0, 0, 0);
@@ -295,13 +347,13 @@ private:
         }
         SDL_RenderSetScale(ren, 1, 1);
 
-        // draw arrows
+        // Рисовать стрелки
         SDL_Rect rect_left{ W / 40, H / 40, W / 15, H / 15 };
         SDL_RenderCopy(ren, back, NULL, &rect_left);
         SDL_Rect replay_rect{ W * 109 / 120, H / 40, W / 15, H / 15 };
         SDL_RenderCopy(ren, replay, NULL, &replay_rect);
 
-        // draw result
+        // Рисовать итог партии
         if (game_results != -1)
         {
             string result_path = draw_path;
@@ -327,6 +379,7 @@ private:
         SDL_PollEvent(&windowEvent);
     }
 
+    // Вывод сообщения об ошибке
     void print_exception(const string& text) {
         ofstream fout(project_path + "log.txt", ios_base::app);
         fout << "Error: " << text << ". "<< SDL_GetError() << endl;
